@@ -1,0 +1,63 @@
+# DOKUMEN PERENCANAAN AWAL: MILESTONE PERTEMUAN 2
+**Proyek:** PJBL-1 — Simulator Tabel Kebenaran & Verifikator Argumen  
+**Nama Kelompok:** CoreDiscrete  
+**Kelompok:** [Isi Nomor Kelompok]  
+
+---
+
+## 1. Identitas Tim Final
+
+| Nama Anggota | Peran / Jabatan Utama | Tanggung Jawab & Pembagian Tugas |
+| :--- | :--- | :--- |
+| **M. Fahril Kal Kausar** | **Ketua Kelompok & Lead Developer** | Mengoordinasikan alur kerja tim, memimpin pengembangan algoritma *Expression Parser* & evaluasi logika, serta mengawasi integrasi sistem. |
+| **Mirja Rahmat** | **Koordinator Dokumentasi & UI Designer** | Menyusun dokumen milestone & laporan akhir, mengelola README/repository GitHub, merancang antarmuka (UI/UX), serta menyiapkan materi visual. |
+| **Intan Iqlima** | **Koordinator Teknis & Fullstack Developer** | Mengimplementasikan logika *Tabel Kebenaran Otomatis*, algoritma klasifikasi (tautologi/kontradiksi/kontingensi), dan pengujian fungsi verifikasi argumen. |
+| **Nur 'amasari** | **Koordinator Presentasi & QA/Tester** | Menyusun struktur slide presentasi, memproduksi video demo proyek (3–5 menit), serta melakukan pengujian kasus uji logika (*bug testing*). |
+
+---
+
+## 2. Pemahaman Masalah & Fungsi Utama
+
+Aplikasi **Simulator Tabel Kebenaran & Verifikator Argumen** dirancang untuk mempermudah analisis logika proposisional secara interaktif. Terdapat **empat fungsi wajib** yang diimplementasikan:
+
+1. **Input Ekspresi Logika:** Menerima input proposisi tunggal maupun majemuk yang mendukung operator logika dasar ($\neg, \land, \lor, \rightarrow, \leftrightarrow$).
+2. **Tabel Kebenaran Otomatis:** Menggenerasi seluruh kombinasi nilai kebenaran secara dinamis sebanyak $2^n$ baris (di mana $n$ adalah jumlah variabel proposisi unik) beserta evaluasi langkah demi langkah.
+3. **Klasifikasi Tautologi / Kontradiksi / Kontingensi:** Menganalisis kolom hasil akhir tabel kebenaran untuk menentukan kategori ekspresi logika secara akurat.
+4. **Verifikasi Validitas Argumen:** Mengevaluasi baris kualifikasi di mana seluruh premis bernilai benar; jika pada baris-baris tersebut konklusi juga selalu bernilai benar, maka argumen dinyatakan **Valid** (sebaliknya dinyatakan **Invalid**).
+
+---
+
+## 3. Pilihan Teknologi
+
+* **Bahasa Pemrograman:** HTML5, CSS3, JavaScript (ES6+)
+* **Framework / Pendekatan:** Responsive Web Application (Native Web Stack)
+* **Alasan Pemilihan:**
+  * **Aksesibilitas Tinggi:** Aplikasi berbasis web dapat dijalankan langsung di peramban tanpa perlunya instalasi *environment* khusus.
+  * **Kemudahan Representasi Data:** Visualisasi tabel kebenaran dengan jumlah baris yang dinamis lebih mudah disusun menggunakan tata letak DOM/HTML yang responsif.
+  * **Efisiensi Parsing:** JavaScript memiliki dukungan penanganan string dan evaluasi ekspresi yang fleksibel untuk pembangunan modul *lexer* dan *parser* logika.
+
+---
+
+## 4. Rancangan Awal Alur Sistem
+
+```text
+[ Input Ekspresi Logika / Premis & Konklusi ]
+                     │
+                     ▼
+       [ Parsing & Tokenisasi String ]
+                     │
+                     ▼
+    [ Generasi Kombinasi Nilai (2^n Baris) ]
+                     │
+                     ▼
+    [ Evaluasi Logika & Pembentukan Tabel ]
+                     │
+         ┌───────────┴───────────┐
+         ▼                       ▼
+  [ Analisis Hasil ]     [ Verifikasi Argumen ]
+  (Tautologi/Kontradiksi/   (Valid / Invalid)
+     Kontingensi)                │
+         │                       │
+         └───────────┬───────────┘
+                     ▼
+            [ Output pada UI ]
