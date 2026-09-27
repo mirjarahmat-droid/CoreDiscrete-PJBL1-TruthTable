@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Generator Tabel Kebenaran</title>
+<style>
+:root{
+  --bg:#f7f7fb; --card:#ffffff; --text:#1c1c22; --muted:#65656f;
+  --accent:#4f46e5; --accent-text:#ffffff; --border:#e3e3ea;
+  --true:#16a34a; --false:#dc2626; --err:#dc2626;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15151a; --card:#1f1f26; --text:#f0f0f5; --muted:#9a9aa5;
+    --accent:#818cf8; --accent-text:#15151a; --border:#33333d;
+    --true:#4ade80; --false:#f87171;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15151a; --card:#1f1f26; --text:#f0f0f5; --muted:#9a9aa5;
+  --accent:#818cf8; --accent-text:#15151a; --border:#33333d;
+  --true:#4ade80; --false:#f87171;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+.wrap{max-width:720px;margin:0 auto;padding:24px 16px 48px;}
+h1{font-size:1.4rem;margin:0 0 4px;}
+p.sub{color:var(--muted);margin:0 0 20px;font-size:.92rem;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+label{font-size:.85rem;color:var(--muted);display:block;margin-bottom:6px;}
+input#expr{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:1rem;font-family:ui-monospace,Menlo,Consolas,monospace;}
+.ops{font-size:.78rem;color:var(--muted);margin-top:8px;line-height:1.5;}
+.ops code{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 5px;}
+button{margin-top:12px;background:var(--accent);color:var(--accent-text);border:none;padding:11px 18px;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;}
+button:active{opacity:.85;}
+#error{color:var(--err);font-size:.88rem;margin-top:10px;white-space:pre-wrap;}
+.tablewrap{overflow-x:auto;}
+table{border-collapse:collapse;width:100%;min-width:280px;}
+th,td{border:1px solid var(--border);padding:8px 12px;text-align:center;font-size:.92rem;}
+th{background:var(--bg);font-family:ui-monospace,Menlo,Consolas,monospace;}
+td.T{color:var(--true);font-weight:600;}
+td.F{color:var(--false);font-weight:600;}
+.meta{font-size:.82rem;color:var(--muted);margin-bottom:10px;}
+.meta code{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Generator Tabel Kebenaran</h1>
+  <p class="sub">Masukkan ekspresi logika, sistem akan melakukan tokenisasi, parsing, mendeteksi variabel, dan membangun seluruh kombinasi T/F.</p>
+
+  <div class="card">
+    <label for="expr">Ekspresi logika</label>
+    <input id="expr" value="(p AND q) OR NOT r" autocomplete="off">
+    <div class="ops">
+      Operator yang didukung: <code>NOT</code>/<code>!</code>/<code>~</code>,
+      <code>AND</code>/<code>&amp;</code>, <code>OR</code>/<code>|</code>,
+      <code>XOR</code>/<code>^</code>, <code>-></code> (implikasi),
+      <code>&lt;-></code> (biimplikasi). Gunakan tanda kurung untuk pengelompokan.
+    </div>
+    <button onclick="generate()">Buat Tabel</button>
+    <div id="error"></div>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+// ---------- Tokenizer ----------
+function tokenize(input){
+  const src = input.trim();
+  const tokens = [];
+  let i = 0;
+  const multi = [["<->","IFF"],["<=>","IFF"],["->","IMPLIES"],["=>","IMPLIES"]];
+  while(i < src.length){
+    const ch = src[i];
+    if(/\s/.test(ch)){ i++; continue; }
+    let matched = false;
+    for(const [sym,type] of multi){
+      if(src.startsWith(sym, i)){ tokens.push({type, text:sym}); i += sym.length; matched = true; break; }
+    }
+    if(matched) continue;
+    if(ch === '('){ tokens.push({type:'LPAREN', text:ch}); i++; continue; }
+    if(ch === ')'){ tokens.push({type:'RPAREN', text:ch}); i++; continue; }
+    if(ch === '!' || ch === '~'){ tokens.push({type:'NOT', text:ch}); i++; continue; }
+    if(ch === '&'){ tokens.push({type:'AND', text:ch}); i++; continue; }
+    if(ch === '|'){ tokens.push({type:'OR', text:ch}); i++; continue; }
+    if(ch === '^'){ tokens.push({type:'XOR', text:ch}); i++; continue; }
+    if(/[A-Za-z_]/.test(ch)){
+      let j = i+1;
+      while(j < src.length && /[A-Za-z0-9_]/.test(src[j])) j++;
+      const word = src.slice(i,j);
+      const upper = word.toUpperCase();
+      const kw = {AND:'AND', OR:'OR', NOT:'NOT', XOR:'XOR', IMPLIES:'IMPLIES', IFF:'IFF'};
+      if(kw[upper]) tokens.push({type:kw[upper], text:word});
+      else tokens.push({type:'VAR', text:word});
+      i = j; continue;
+    }
+    throw new Error("Karakter tidak dikenali: '" + ch + "' pada posisi " + i);
+  }
+  tokens.push({type:'EOF', text:''});
+  return tokens;
+}
+
+// ---------- Parser (recursive descent, precedence: IFF < IMPLIES < OR < XOR < AND < NOT) ----------
+function parse(tokens){
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const eat = (type) => {
+    if(peek().type !== type) throw new Error("Diharapkan '" + type + "' tapi ditemukan '" + peek().text + "'");
+    return tokens[pos++];
+  };
+  function parseIff(){
+    let node = parseImplies();
+    while(peek().type === 'IFF'){ eat('IFF'); node = {type:'IFF', left:node, right:parseImplies()}; }
+    return node;
+  }
+  function parseImplies(){
+    let node = parseOr();
+    if(peek().type === 'IMPLIES'){ eat('IMPLIES'); node = {type:'IMPLIES', left:node, right:parseImplies()}; }
+    return node;
+  }
+  function parseOr(){
+    let node = parseXor();
+    while(peek().type === 'OR'){ eat('OR'); node = {type:'OR', left:node, right:parseXor()}; }
+    return node;
+  }
+  function parseXor(){
+    let node = parseAnd();
+    while(peek().type === 'XOR'){ eat('XOR'); node = {type:'XOR', left:node, right:parseAnd()}; }
+    return node;
+  }
+  function parseAnd(){
+    let node = parseNot();
+    while(peek().type === 'AND'){ eat('AND'); node = {type:'AND', left:node, right:parseNot()}; }
+    return node;
+  }
+  function parseNot(){
+    if(peek().type === 'NOT'){ eat('NOT'); return {type:'NOT', operand:parseNot()}; }
+    return parsePrimary();
+  }
+  function parsePrimary(){
+    if(peek().type === 'VAR'){ const t = eat('VAR'); return {type:'VAR', name:t.text}; }
+    if(peek().type === 'LPAREN'){ eat('LPAREN'); const node = parseIff(); eat('RPAREN'); return node; }
+    throw new Error("Token tidak terduga: '" + peek().text + "'");
+  }
+  const ast = parseIff();
+  if(peek().type !== 'EOF') throw new Error("Token tersisa setelah parsing: '" + peek().text + "'");
+  return ast;
+}
+
+// ---------- Variable detection ----------
+function collectVars(ast, set){
+  if(ast.type === 'VAR'){ set.add(ast.name); return; }
+  if(ast.type === 'NOT'){ collectVars(ast.operand, set); return; }
+  collectVars(ast.left, set); collectVars(ast.right, set);
+}
+
+// ---------- Evaluator ----------
+function evaluate(ast, env){
+  switch(ast.type){
+    case 'VAR': return env[ast.name];
+    case 'NOT': return !evaluate(ast.operand, env);
+    case 'AND': return evaluate(ast.left, env) && evaluate(ast.right, env);
+    case 'OR': return evaluate(ast.left, env) || evaluate(ast.right, env);
+    case 'XOR': return evaluate(ast.left, env) !== evaluate(ast.right, env);
+    case 'IMPLIES': return (!evaluate(ast.left, env)) || evaluate(ast.right, env);
+    case 'IFF': return evaluate(ast.left, env) === evaluate(ast.right, env);
+  }
+}
+
+// ---------- Main ----------
+function generate(){
+  const input = document.getElementById('expr').value;
+  const errBox = document.getElementById('error');
+  const resultBox = document.getElementById('result');
+  errBox.textContent = '';
+  resultBox.innerHTML = '';
+  try{
+    const tokens = tokenize(input);
+    const ast = parse(tokens);
+    const varSet = new Set();
+    collectVars(ast, varSet);
+    const vars = Array.from(varSet).sort();
+    if(vars.length === 0) throw new Error("Tidak ada variabel ditemukan dalam ekspresi.");
+    if(vars.length > 8) throw new Error("Terlalu banyak variabel (" + vars.length + "). Maksimum 8 untuk menjaga tabel tetap ringkas.");
+
+    const n = vars.length;
+    const rows = Math.pow(2, n);
+    let html = '<div class="card">';
+    html += '<div class="meta">Variabel terdeteksi: ' + vars.map(v=>'<code>'+v+'</code>').join(', ') +
+            ' &middot; ' + rows + ' baris kombinasi</div>';
+    html += '<div class="tablewrap"><table><thead><tr>';
+    vars.forEach(v => html += '<th>' + v + '</th>');
+    html += '<th>Hasil</th></tr></thead><tbody>';
+
+    for(let i = 0; i < rows; i++){
+      const env = {};
+      vars.forEach((v, j) => { env[v] = ((i >> (n-1-j)) & 1) === 0; });
+      const res = evaluate(ast, env);
+      html += '<tr>';
+      vars.forEach(v => html += '<td class="' + (env[v]?'T':'F') + '">' + (env[v]?'T':'F') + '</td>');
+      html += '<td class="' + (res?'T':'F') + '">' + (res?'T':'F') + '</td></tr>';
+    }
+    html += '</tbody></table></div></div>';
+    resultBox.innerHTML = html;
+  }catch(e){
+    errBox.textContent = 'Error: ' + e.message;
+  }
+}
+
+document.getElementById('expr').addEventListener('keydown', function(e){
+  if(e.key === 'Enter') generate();
+});
+generate();
+</script>
+</body>
+</html>
